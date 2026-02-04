@@ -5,6 +5,7 @@ import (
 	"go-server/internal/config"
 	"go-server/internal/db"
 	"go-server/internal/server"
+	"go-server/internal/support"
 	"log"
 )
 func main(){
@@ -24,9 +25,13 @@ func main(){
 			log.Fatalf("Failed to disconnect from database: %v", err)
 		}
 	}()
-	fmt.Println("Database connected successfully")
 
-	router := server.NewRouter()
+	fmt.Println("Database connected successfully")
+	go func(){
+		db.Migrate(database,&support.Support{})
+	}()
+
+	router := server.NewRouter(database)
 
 	addr := fmt.Sprintf(":%s", config.ServerPort)
 	if err := router.Run(addr); err != nil {

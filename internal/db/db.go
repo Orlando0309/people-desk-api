@@ -27,3 +27,7 @@ func Disconnect(db *gorm.DB) error {
 	}
 	return sqlDB.Close()
 }
+
+func Migrate(db *gorm.DB, models ...interface{}) error {
+	return db.AutoMigrate(models...)
+}

@@ -1,23 +1,43 @@
 package db
+
 import (
-	"go-server/internal/config"
-	"gorm.io/gorm"
-	"gorm.io/driver/postgres"
 	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"go-server/internal/config"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
-func Connect(conf config.Config) (*gorm.DB,error) {
+func Connect(conf config.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		conf.DBHost,
 		conf.DBPort,
 		conf.DBUser,
 		conf.DBPassword,
 		conf.DBDatabase)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+
+	newLogger := logger.New(
+		log.New(os.Stdout, "", log.LstdFlags),
+		logger.Config{
+			SlowThreshold:             time.Second,
+			LogLevel:                  logger.Info,
+			IgnoreRecordNotFoundError: true,
+			Colorful:                  false,
+		},
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: newLogger,
+	})
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
-	return db,nil
+	return db, nil
 }
 
 func Disconnect(db *gorm.DB) error {

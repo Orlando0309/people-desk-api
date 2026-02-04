@@ -1,0 +1,15 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/api.exe ./cmd/api"
+bin = "./tmp/api.exe"
+exclude_dir = ["assets", "tmp", "vendor"]
+exclude_regex = ["_test.go"]
+delay = 1000
+
+[log]
+time = true
+
+[screen]
+clear_on_rebuild = true

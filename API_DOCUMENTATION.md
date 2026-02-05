@@ -81,9 +81,77 @@ Change password
 List all users
 - **Access:** Admin only
 
+### PUT /auth/users/:id
+Update user
+- **Access:** Admin only
+- **Request Body:**
+```json
+{
+  "email": "user@example.com",
+  "role": "hr",
+  "is_active": true
+}
+```
+
+### DELETE /auth/users/:id
+Delete user
+- **Access:** Admin only
+
 ---
 
-## 2. Employee Management Endpoints
+## 2. Dashboard Endpoints
+
+### GET /dashboard/stats
+Get dashboard statistics
+- **Access:** Authenticated users
+- **Response:**
+```json
+{
+  "total_employees": 100,
+  "on_leave_today": 5,
+  "present_today": 90,
+  "absent_today": 5,
+  "overtime_hours_today": 12.5
+}
+```
+
+### GET /dashboard/attendance/summary
+Get attendance summary
+- **Access:** Authenticated users
+- **Response:**
+```json
+{
+  "total_days": 20,
+  "present_days": 18,
+  "absent_days": 1,
+  "late_days": 1,
+  "average_hours": 8.5,
+  "total_overtime": 25.5
+}
+```
+
+### GET /dashboard/leaves/balances
+Get leave balances for all employees
+- **Access:** Authenticated users
+- **Response:**
+```json
+{
+  "leaves": [
+    {
+      "employee_id": "uuid",
+      "employee_name": "John Doe",
+      "annual_leave_balance": 15,
+      "sick_leave_balance": 10,
+      "maternity_leave_balance": 0,
+      "paternity_leave_balance": 0
+    }
+  ]
+}
+```
+
+---
+
+## 3. Employee Management Endpoints
 
 ### GET /employees
 List employees with filtering
@@ -148,7 +216,7 @@ Get employee's subordinates
 
 ---
 
-## 3. Attendance Management Endpoints
+## 4. Attendance Management Endpoints
 
 ### POST /attendance/clock-in
 Clock in for the day
@@ -211,7 +279,7 @@ Get attendance statistics
 
 ---
 
-## 4. Leave Management Endpoints
+## 5. Leave Management Endpoints
 
 ### GET /leaves
 List leave requests
@@ -279,7 +347,7 @@ Reject a leave request
 
 ---
 
-## 5. Audit Trail Endpoints
+## 6. Audit Trail Endpoints
 
 ### GET /audit/logs
 List audit logs with filtering
@@ -330,7 +398,7 @@ Get complete history for a specific record
 
 ---
 
-## 6. Payroll Module Endpoints
+## 7. Payroll Module Endpoints
 
 ### POST /payroll/drafts
 Create a new payroll draft
@@ -416,7 +484,7 @@ Generate reconciliation report
 
 ---
 
-## 7. KPI & Performance Management Endpoints
+## 8. KPI & Performance Management Endpoints
 
 ### POST /kpi
 Create a new KPI template
@@ -515,7 +583,7 @@ Generate performance report for an employee
 
 ---
 
-## 8. Declarations Module Endpoints
+## 9. Declarations Module Endpoints
 
 ### POST /declarations
 Create a new monthly declaration
@@ -634,7 +702,7 @@ Delete IRSA tax bracket
 
 ---
 
-## 9. Support/Complaints Endpoints
+## 10. Support/Complaints Endpoints
 
 ### POST /support
 Submit a support ticket or complaint

@@ -141,14 +141,14 @@ func GetUserRole(c *gin.Context) (string, error) {
 	return roleStr, nil
 }
 
-// GenerateAccessToken generates a JWT access token (15 minutes)
+// GenerateAccessToken generates a JWT access token (1 hour)
 func GenerateAccessToken(userID uuid.UUID, email, role string) (string, error) {
 	claims := JWTClaims{
 		UserID: userID.String(),
 		Email:  email,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}

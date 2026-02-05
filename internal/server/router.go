@@ -4,6 +4,7 @@ import (
 	"go-server/internal/attendance"
 	"go-server/internal/audit"
 	"go-server/internal/auth"
+	"go-server/internal/dashboard"
 	"go-server/internal/declarations"
 	"go-server/internal/employee"
 	"go-server/internal/kpi"
@@ -36,6 +37,7 @@ func NewRouter(gormDB *gorm.DB) *gin.Engine {
 		payroll.RegisterRoutes(api, gormDB)
 		kpi.RegisterRoutes(api, gormDB)
 		declarations.RegisterRoutes(api, gormDB)
+		dashboard.RegisterRoutes(api, gormDB)
 	}
 
 	return r

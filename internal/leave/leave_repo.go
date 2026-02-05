@@ -3,6 +3,7 @@ package leave
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -139,80 +140,66 @@ func (r *Repo) GetLeaveBalance(ctx context.Context, employeeID uuid.UUID, year i
 		AnnualTotal: 30, // 30 days per year as per Madagascar law
 	}
 
-	// Calculate used leave days for each type
+	// Calculate used leave days for each type concurrently
 	startOfYear := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
 	endOfYear := time.Date(year, 12, 31, 23, 59, 59, 0, time.UTC)
 
-	// Annual leave used
-	var annualUsed *float64
-	if err := r.db.WithContext(ctx).Model(&Leave{}).
-		Where("employee_id = ? AND leave_type = ? AND status = ? AND start_date >= ? AND end_date <= ?",
-			employeeID, "annual", "approved", startOfYear, endOfYear).
-		Select("COALESCE(SUM(days_requested), 0)").Scan(&annualUsed).Error; err != nil {
-		return nil, fmt.Errorf("calculate annual leave: %w", err)
-	}
-	if annualUsed != nil {
-		balance.AnnualUsed = *annualUsed
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var err error
+
+	// Helper function to safely execute queries concurrently
+	queryLeaveType := func(leaveType string) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var used *float64
+			result := r.db.WithContext(ctx).Model(&Leave{}).
+				Where("employee_id = ? AND leave_type = ? AND status = ? AND start_date >= ? AND end_date <= ?",
+					employeeID, leaveType, "approved", startOfYear, endOfYear).
+				Select("COALESCE(SUM(days_requested), 0)").Scan(&used)
+			if result != nil && result.Error != nil {
+				mu.Lock()
+				if err == nil {
+					err = fmt.Errorf("calculate %s leave: %w", leaveType, result.Error)
+				}
+				mu.Unlock()
+				return
+			}
+			if used != nil {
+				mu.Lock()
+				switch leaveType {
+				case "annual":
+					balance.AnnualUsed = *used
+				case "sick":
+					balance.SickUsed = *used
+				case "maternity":
+					balance.MaternityUsed = *used
+				case "exceptional":
+					balance.ExceptionalUsed = *used
+				case "paternity":
+					balance.PaternityUsed = *used
+				case "unpaid":
+					balance.UnpaidUsed = *used
+				}
+				mu.Unlock()
+			}
+		}()
 	}
 
-	// Sick leave used
-	var sickUsed *float64
-	if err := r.db.WithContext(ctx).Model(&Leave{}).
-		Where("employee_id = ? AND leave_type = ? AND status = ? AND start_date >= ? AND end_date <= ?",
-			employeeID, "sick", "approved", startOfYear, endOfYear).
-		Select("COALESCE(SUM(days_requested), 0)").Scan(&sickUsed).Error; err != nil {
-		return nil, fmt.Errorf("calculate sick leave: %w", err)
-	}
-	if sickUsed != nil {
-		balance.SickUsed = *sickUsed
-	}
+	// Execute all leave type queries concurrently
+	queryLeaveType("annual")
+	queryLeaveType("sick")
+	queryLeaveType("maternity")
+	queryLeaveType("exceptional")
+	queryLeaveType("paternity")
+	queryLeaveType("unpaid")
 
-	// Maternity leave used
-	var maternityUsed *float64
-	if err := r.db.WithContext(ctx).Model(&Leave{}).
-		Where("employee_id = ? AND leave_type = ? AND status = ? AND start_date >= ? AND end_date <= ?",
-			employeeID, "maternity", "approved", startOfYear, endOfYear).
-		Select("COALESCE(SUM(days_requested), 0)").Scan(&maternityUsed).Error; err != nil {
-		return nil, fmt.Errorf("calculate maternity leave: %w", err)
-	}
-	if maternityUsed != nil {
-		balance.MaternityUsed = *maternityUsed
-	}
+	// Wait for all queries to complete
+	wg.Wait()
 
-	// Exceptional leave used
-	var exceptionalUsed *float64
-	if err := r.db.WithContext(ctx).Model(&Leave{}).
-		Where("employee_id = ? AND leave_type = ? AND status = ? AND start_date >= ? AND end_date <= ?",
-			employeeID, "exceptional", "approved", startOfYear, endOfYear).
-		Select("COALESCE(SUM(days_requested), 0)").Scan(&exceptionalUsed).Error; err != nil {
-		return nil, fmt.Errorf("calculate exceptional leave: %w", err)
-	}
-	if exceptionalUsed != nil {
-		balance.ExceptionalUsed = *exceptionalUsed
-	}
-
-	// Paternity leave used
-	var paternityUsed *float64
-	if err := r.db.WithContext(ctx).Model(&Leave{}).
-		Where("employee_id = ? AND leave_type = ? AND status = ? AND start_date >= ? AND end_date <= ?",
-			employeeID, "paternity", "approved", startOfYear, endOfYear).
-		Select("COALESCE(SUM(days_requested), 0)").Scan(&paternityUsed).Error; err != nil {
-		return nil, fmt.Errorf("calculate paternity leave: %w", err)
-	}
-	if paternityUsed != nil {
-		balance.PaternityUsed = *paternityUsed
-	}
-
-	// Unpaid leave used
-	var unpaidUsed *float64
-	if err := r.db.WithContext(ctx).Model(&Leave{}).
-		Where("employee_id = ? AND leave_type = ? AND status = ? AND start_date >= ? AND end_date <= ?",
-			employeeID, "unpaid", "approved", startOfYear, endOfYear).
-		Select("COALESCE(SUM(days_requested), 0)").Scan(&unpaidUsed).Error; err != nil {
-		return nil, fmt.Errorf("calculate unpaid leave: %w", err)
-	}
-	if unpaidUsed != nil {
-		balance.UnpaidUsed = *unpaidUsed
+	if err != nil {
+		return nil, err
 	}
 
 	// Calculate remaining annual leave

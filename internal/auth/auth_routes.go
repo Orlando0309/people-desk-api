@@ -21,7 +21,12 @@ func RegisterRoutes(rg *gin.RouterGroup, gormDB *gorm.DB) {
 		// Protected routes
 		auth.POST("/register", middleware.AuthMiddleware(), middleware.RequireRole("admin"), handler.Register)
 		auth.GET("/profile", middleware.AuthMiddleware(), handler.GetProfile)
+		auth.PUT("/profile", middleware.AuthMiddleware(), handler.UpdateProfile)
 		auth.PUT("/change-password", middleware.AuthMiddleware(), handler.ChangePassword)
 		auth.GET("/users", middleware.AuthMiddleware(), middleware.RequireRole("admin"), handler.ListUsers)
+
+		// User preferences routes
+		auth.GET("/preferences", middleware.AuthMiddleware(), handler.GetPreferences)
+		auth.PUT("/preferences", middleware.AuthMiddleware(), handler.UpdatePreferences)
 	}
 }

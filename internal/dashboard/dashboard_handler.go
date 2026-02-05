@@ -148,6 +148,69 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
 }
 
+// GetBadgeCounts retrieves badge counts for navigation items
+func (h *Handler) GetBadgeCounts(c *gin.Context) {
+	// Get user info
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userRole, err := middleware.GetUserRole(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User role not found"})
+		return
+	}
+
+	badgeCounts, err := h.repo.GetBadgeCounts(c.Request.Context(), userID, userRole)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get badge counts"})
+		return
+	}
+
+	c.JSON(http.StatusOK, badgeCounts)
+}
+
+// GetCalendarEvents retrieves calendar events for date range
+func (h *Handler) GetCalendarEvents(c *gin.Context) {
+	var query CalendarEventsQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user info
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userRole, err := middleware.GetUserRole(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User role not found"})
+		return
+	}
+
+	// Employees can only see their own data unless employee_id is explicitly set
+	if userRole == "employee" && query.EmployeeID == nil {
+		query.EmployeeID = &userID
+	}
+
+	events, err := h.repo.GetCalendarEvents(c.Request.Context(), query, userID, userRole)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get calendar events"})
+		return
+	}
+
+	response := CalendarEventsResponse{
+		Events: events,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
 // splitString splits a comma-separated string into a slice
 func splitString(s, sep string) []string {
 	if s == "" {
@@ -173,4 +236,118 @@ func rangeSplit(s, sep string) []string {
 	}
 	result = append(result, s[start:])
 	return result
+}
+
+// GetMonthlyPayroll retrieves monthly payroll summary
+func (h *Handler) GetMonthlyPayroll(c *gin.Context) {
+	// Parse month parameter
+	month := c.DefaultQuery("month", time.Now().Format("2006-01"))
+
+	// Validate month format
+	if _, err := time.Parse("2006-01", month); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid month format. Use YYYY-MM"})
+		return
+	}
+
+	// Get user role
+	userRole, err := middleware.GetUserRole(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Only Admin, HR, and Accountant can access payroll data
+	if userRole != "admin" && userRole != "hr" && userRole != "accountant" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
+		return
+	}
+
+	payrollSummary, err := h.repo.GetMonthlyPayrollSummary(c.Request.Context(), month)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get monthly payroll summary"})
+		return
+	}
+
+	c.JSON(http.StatusOK, payrollSummary)
+}
+
+// GetCompliance retrieves compliance status for all modules
+func (h *Handler) GetCompliance(c *gin.Context) {
+	// Get user role
+	userRole, err := middleware.GetUserRole(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Only Admin, HR, and Accountant can access compliance data
+	if userRole != "admin" && userRole != "hr" && userRole != "accountant" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
+		return
+	}
+
+	compliance, err := h.repo.GetComplianceStatus(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get compliance status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, compliance)
+}
+
+// GetWeeklyAttendance retrieves weekly attendance summary
+func (h *Handler) GetWeeklyAttendance(c *gin.Context) {
+	// Parse query parameters
+	employeeIDParam := c.Query("employee_id")
+	startDateParam := c.DefaultQuery("start_date", time.Now().Format("2006-01-02"))
+
+	// Validate date format
+	startDate, err := time.Parse("2006-01-02", startDateParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start_date format. Use YYYY-MM-DD"})
+		return
+	}
+
+	// Get user info
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userRole, err := middleware.GetUserRole(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User role not found"})
+		return
+	}
+
+	// Parse employee ID if provided
+	var employeeID *uuid.UUID
+	if employeeIDParam != "" {
+		id, err := uuid.Parse(employeeIDParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid employee ID"})
+			return
+		}
+		employeeID = &id
+	}
+
+	// Employees can only see their own data
+	if userRole == "employee" && employeeID != nil && *employeeID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot view another employee's attendance"})
+		return
+	}
+
+	// If employee and no employee_id specified, use their own ID
+	if userRole == "employee" && employeeID == nil {
+		employeeID = &userID
+	}
+
+	weeklyAttendance, err := h.repo.GetWeeklyAttendanceSummary(c.Request.Context(), employeeID, startDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get weekly attendance summary"})
+		return
+	}
+
+	c.JSON(http.StatusOK, weeklyAttendance)
 }

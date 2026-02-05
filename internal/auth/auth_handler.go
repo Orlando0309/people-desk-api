@@ -124,12 +124,16 @@ func (h *Handler) Login(c *gin.Context) {
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		User: UserResponse{
-			ID:         user.ID,
-			Email:      user.Email,
-			Role:       user.Role,
-			EmployeeID: user.EmployeeID,
-			IsActive:   user.IsActive,
-			LastLogin:  user.LastLogin,
+			ID:                    user.ID,
+			Email:                 user.Email,
+			Role:                  user.Role,
+			EmployeeID:            user.EmployeeID,
+			Phone:                 user.Phone,
+			Address:               user.Address,
+			EmergencyContactName:  user.EmergencyContactName,
+			EmergencyContactPhone: user.EmergencyContactPhone,
+			IsActive:              user.IsActive,
+			LastLogin:             user.LastLogin,
 		},
 	})
 }
@@ -202,12 +206,16 @@ func (h *Handler) GetProfile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, UserResponse{
-		ID:         user.ID,
-		Email:      user.Email,
-		Role:       user.Role,
-		EmployeeID: user.EmployeeID,
-		IsActive:   user.IsActive,
-		LastLogin:  user.LastLogin,
+		ID:                    user.ID,
+		Email:                 user.Email,
+		Role:                  user.Role,
+		EmployeeID:            user.EmployeeID,
+		Phone:                 user.Phone,
+		Address:               user.Address,
+		EmergencyContactName:  user.EmergencyContactName,
+		EmergencyContactPhone: user.EmergencyContactPhone,
+		IsActive:              user.IsActive,
+		LastLogin:             user.LastLogin,
 	})
 }
 
@@ -270,19 +278,174 @@ func (h *Handler) ListUsers(c *gin.Context) {
 	userResponses := make([]UserResponse, len(users))
 	for i, user := range users {
 		userResponses[i] = UserResponse{
-			ID:         user.ID,
-			Email:      user.Email,
-			Role:       user.Role,
-			EmployeeID: user.EmployeeID,
-			IsActive:   user.IsActive,
-			LastLogin:  user.LastLogin,
+			ID:                    user.ID,
+			Email:                 user.Email,
+			Role:                  user.Role,
+			EmployeeID:            user.EmployeeID,
+			Phone:                 user.Phone,
+			Address:               user.Address,
+			EmergencyContactName:  user.EmergencyContactName,
+			EmergencyContactPhone: user.EmergencyContactPhone,
+			IsActive:              user.IsActive,
+			LastLogin:             user.LastLogin,
 		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"users": userResponses,
-		"total": total,
-		"limit": limit,
+		"users":  userResponses,
+		"total":  total,
+		"limit":  limit,
 		"offset": offset,
 	})
+}
+
+// UpdateProfile updates current user's profile
+func (h *Handler) UpdateProfile(c *gin.Context) {
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	var input UpdateProfileRequest
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user
+	user, err := h.repo.GetUserByID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Update fields if provided
+	if input.Email != nil {
+		user.Email = *input.Email
+	}
+	if input.Phone != nil {
+		user.Phone = input.Phone
+	}
+	if input.Address != nil {
+		user.Address = input.Address
+	}
+	if input.EmergencyContactName != nil {
+		user.EmergencyContactName = input.EmergencyContactName
+	}
+	if input.EmergencyContactPhone != nil {
+		user.EmergencyContactPhone = input.EmergencyContactPhone
+	}
+
+	user.UpdatedAt = time.Now()
+
+	if err := h.repo.UpdateUser(c.Request.Context(), user); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		return
+	}
+
+	c.JSON(http.StatusOK, UserResponse{
+		ID:                    user.ID,
+		Email:                 user.Email,
+		Role:                  user.Role,
+		EmployeeID:            user.EmployeeID,
+		Phone:                 user.Phone,
+		Address:               user.Address,
+		EmergencyContactName:  user.EmergencyContactName,
+		EmergencyContactPhone: user.EmergencyContactPhone,
+		IsActive:              user.IsActive,
+		UpdatedAt:             &user.UpdatedAt,
+	})
+}
+
+// GetPreferences retrieves current user's preferences
+func (h *Handler) GetPreferences(c *gin.Context) {
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	prefs, err := h.repo.GetUserPreferences(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get preferences"})
+		return
+	}
+
+	response := PreferencesResponse{}
+	response.Notifications.EmailEnabled = prefs.EmailNotifications
+	response.Notifications.PushEnabled = prefs.PushNotifications
+	response.Notifications.LeaveUpdates = prefs.LeaveUpdates
+	response.Notifications.PayrollUpdates = prefs.PayrollUpdates
+	response.Notifications.SystemUpdates = prefs.SystemUpdates
+	response.Display.Theme = prefs.Theme
+	response.Display.Language = prefs.Language
+	response.Display.DateFormat = prefs.DateFormat
+
+	c.JSON(http.StatusOK, response)
+}
+
+// UpdatePreferences updates current user's preferences
+func (h *Handler) UpdatePreferences(c *gin.Context) {
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	var input UpdatePreferencesRequest
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get existing preferences
+	prefs, err := h.repo.GetUserPreferences(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get preferences"})
+		return
+	}
+
+	// Update fields if provided
+	if input.EmailNotifications != nil {
+		prefs.EmailNotifications = *input.EmailNotifications
+	}
+	if input.PushNotifications != nil {
+		prefs.PushNotifications = *input.PushNotifications
+	}
+	if input.LeaveUpdates != nil {
+		prefs.LeaveUpdates = *input.LeaveUpdates
+	}
+	if input.PayrollUpdates != nil {
+		prefs.PayrollUpdates = *input.PayrollUpdates
+	}
+	if input.SystemUpdates != nil {
+		prefs.SystemUpdates = *input.SystemUpdates
+	}
+	if input.Theme != nil {
+		prefs.Theme = *input.Theme
+	}
+	if input.Language != nil {
+		prefs.Language = *input.Language
+	}
+	if input.DateFormat != nil {
+		prefs.DateFormat = *input.DateFormat
+	}
+
+	if err := h.repo.UpdateUserPreferences(c.Request.Context(), prefs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update preferences"})
+		return
+	}
+
+	response := PreferencesResponse{}
+	response.Notifications.EmailEnabled = prefs.EmailNotifications
+	response.Notifications.PushEnabled = prefs.PushNotifications
+	response.Notifications.LeaveUpdates = prefs.LeaveUpdates
+	response.Notifications.PayrollUpdates = prefs.PayrollUpdates
+	response.Notifications.SystemUpdates = prefs.SystemUpdates
+	response.Display.Theme = prefs.Theme
+	response.Display.Language = prefs.Language
+	response.Display.DateFormat = prefs.DateFormat
+
+	c.JSON(http.StatusOK, response)
 }

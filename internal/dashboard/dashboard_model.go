@@ -47,6 +47,34 @@ type UpdateUserRequest struct {
 	IsActive *bool   `json:"is_active"`
 }
 
+// CalendarEvent represents a calendar event
+type CalendarEvent struct {
+	ID            uuid.UUID  `json:"id"`
+	Type          string     `json:"type"`
+	Title         string     `json:"title"`
+	StartDate     string     `json:"start_date"`
+	EndDate       string     `json:"end_date"`
+	EmployeeID    *uuid.UUID `json:"employee_id,omitempty"`
+	EmployeeName  string     `json:"employee_name,omitempty"`
+	LeaveType     string     `json:"leave_type,omitempty"`
+	Status        string     `json:"status,omitempty"`
+	Color         string     `json:"color,omitempty"`
+	IsCompanyWide bool       `json:"is_company_wide,omitempty"`
+}
+
+// CalendarEventsQuery represents query parameters for calendar events
+type CalendarEventsQuery struct {
+	StartDate  string     `form:"start_date" binding:"required"`
+	EndDate    string     `form:"end_date" binding:"required"`
+	EventTypes []string   `form:"event_types"`
+	EmployeeID *uuid.UUID `form:"employee_id"`
+}
+
+// CalendarEventsResponse represents the response for calendar events
+type CalendarEventsResponse struct {
+	Events []CalendarEvent `json:"events"`
+}
+
 // TableName specifies the table name for models
 func (DashboardStats) TableName() string {
 	return "dashboard_stats"

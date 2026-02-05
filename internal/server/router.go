@@ -4,13 +4,16 @@ import (
 	"go-server/internal/attendance"
 	"go-server/internal/audit"
 	"go-server/internal/auth"
+	"go-server/internal/company"
 	"go-server/internal/dashboard"
 	"go-server/internal/declarations"
 	"go-server/internal/employee"
 	"go-server/internal/kpi"
 	"go-server/internal/leave"
+	"go-server/internal/notifications"
 	"go-server/internal/payroll"
 	"go-server/internal/support"
+	"go-server/internal/support_tickets"
 	"net/http"
 	"os"
 	"strings"
@@ -64,6 +67,9 @@ func NewRouter(gormDB *gorm.DB) *gin.Engine {
 		kpi.RegisterRoutes(api, gormDB)
 		declarations.RegisterRoutes(api, gormDB)
 		dashboard.RegisterRoutes(api, gormDB)
+		notifications.RegisterRoutes(api, gormDB)
+		support_tickets.RegisterRoutes(api, gormDB)
+		company.RegisterRoutes(api, gormDB)
 	}
 
 	return r

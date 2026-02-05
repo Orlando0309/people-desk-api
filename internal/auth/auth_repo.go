@@ -166,3 +166,52 @@ func (r *Repo) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	}
 	return nil
 }
+
+// GetUserPreferences retrieves user preferences
+func (r *Repo) GetUserPreferences(ctx context.Context, userID uuid.UUID) (*UserPreferences, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	var prefs UserPreferences
+	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&prefs).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Return default preferences if not found
+			return &UserPreferences{
+				UserID:             userID,
+				EmailNotifications: true,
+				PushNotifications:  false,
+				LeaveUpdates:       true,
+				PayrollUpdates:     true,
+				SystemUpdates:      false,
+				Theme:              "light",
+				Language:           "en",
+				DateFormat:         "DD/MM/YYYY",
+			}, nil
+		}
+		return nil, fmt.Errorf("get user preferences: %w", err)
+	}
+	return &prefs, nil
+}
+
+// UpdateUserPreferences updates user preferences
+func (r *Repo) UpdateUserPreferences(ctx context.Context, prefs *UserPreferences) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	prefs.UpdatedAt = time.Now()
+
+	// Try to update, if not found, create
+	result := r.db.WithContext(ctx).Where("user_id = ?", prefs.UserID).Updates(prefs)
+	if result.Error != nil {
+		return fmt.Errorf("update user preferences: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		// Create new preferences
+		if err := r.db.WithContext(ctx).Create(prefs).Error; err != nil {
+			return fmt.Errorf("create user preferences: %w", err)
+		}
+	}
+
+	return nil
+}

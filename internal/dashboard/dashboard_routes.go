@@ -23,6 +23,21 @@ func RegisterRoutes(rg *gin.RouterGroup, gormDB *gorm.DB) {
 
 		// Get leave balances
 		dashboard.GET("/leaves/balances", handler.GetLeaveBalances)
+
+		// Get monthly payroll summary (Admin/HR/Accountant only)
+		dashboard.GET("/payroll/monthly", middleware.RequireRole("admin", "hr", "accountant"), handler.GetMonthlyPayroll)
+
+		// Get compliance status (Admin/HR/Accountant only)
+		dashboard.GET("/compliance", middleware.RequireRole("admin", "hr", "accountant"), handler.GetCompliance)
+
+		// Get badge counts for navigation items
+		dashboard.GET("/badges", handler.GetBadgeCounts)
+
+		// Get weekly attendance summary
+		dashboard.GET("/attendance/weekly", handler.GetWeeklyAttendance)
+
+		// Get calendar events
+		dashboard.GET("/calendar/events", handler.GetCalendarEvents)
 	}
 
 	// User management routes (admin only)
